@@ -80,10 +80,16 @@ excel <- excel %>%
 
 excel %>% count(comments)
 
-# Try forcats::fct_explicit_na() again
+# Try forcats::fct_explicit_na() 
+table(excel$comments)
+table(excel$comments, exclude = NULL)
+
 excel %>% 
   ggplot(aes(y=values, x = first_column, color = comments)) + 
   geom_point()
+
+
+table(forcats::fct_explicit_na(excel$comments))
 
 excel %>% 
   mutate(comments = forcats::fct_explicit_na(comments)) %>% 
