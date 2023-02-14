@@ -1,0 +1,54 @@
+---
+title: "Tidy Tuesday Meetup"
+subtitle: "2023 week 7: Hollywood age gaps"
+author: "Alice Walsh for R-Ladies Philly"
+date: "2023-02-15"
+output: 
+  html_document:
+    theme: lumen
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages, echo=FALSE}
+# This code chunk won't be displayed in final product because set echo=FALSE
+library(dplyr)
+library(ggplot2)
+```
+
+# Overview
+
+Let's look at some fun data! 
+
+https://github.com/rfordatascience/tidytuesday/tree/master/data/2023/2023-02-14
+
+
+# Load the data
+
+```{r}
+age_gaps <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-02-14/age_gaps.csv')
+
+glimpse(age_gaps)
+```
+
+# Ideas
+
++ Are the age gaps between leads getting smaller or larger?
++ Can we make some interesting plots to show the trends over time?
++ Can we make an interesting table?
++ Maybe we can find additional data on the directors to merge in?
++ Maybe we can find additional data on the movies (e.g., [bechdel test data](https://github.com/rfordatascience/tidytuesday/blob/master/data/2021/2021-03-09/readme.md)) to add in?
+
+```{r}
+movies <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-09/movies.csv')
+
+```
+
+# Contact information
+For any questions, contact <philly@rladies.org>
+  
