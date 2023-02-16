@@ -112,11 +112,11 @@ healthcare$sector <- "healthcare"
 big_tech_stock_prices$sector <- "tech"
 
 healthcare <- rbind(big_tech_stock_prices, healthcare)
-        
+
 ```
 
 ```{r}
-# gghighlight with facet - ada labels too
+# gghighlight with facet - add labels too
 last_price <- healthcare %>% 
         group_by(stock_symbol) %>% 
         slice_max(date, n = 1)
@@ -124,14 +124,19 @@ healthcare %>%
         ggplot(aes(x = date, y = open)) + 
         geom_line(aes(group = stock_symbol, color = sector)) + 
         facet_wrap(~sector, ncol = 1) + 
-        geom_label(aes(label = stock_symbol, y = open, x = date),
-                   data = last_price) + 
-        gghighlight() + 
+        # gghighlight can add labels with ggrepel, but we forced it!
+        ggrepel::geom_label_repel(aes(label = stock_symbol, y = open, x = date),
+                                  data = last_price) +
+        gghighlight(label_key = NULL) +
         scale_color_manual(values = c("dodgerblue3", "goldenrod")) + 
-        labs(y = "Opening Price", x = "Date") + 
+        labs(y = "Opening Price", x = "Date",
+             caption = "#TidyTuesday @RLadiesPhilly") + 
         theme_minimal() 
-        
+
 ```
+
+From here, it would be cool to make better plots that make it clearer what the trends were or to zoom in 
+on some examples so that it was more legible. But great start for only 30 minutes!
 
 # Contact information
 For any questions, contact <philly@rladies.org>
