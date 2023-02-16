@@ -19,6 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # This code chunk won't be displayed in final product because set echo=FALSE
 library(dplyr)
 library(ggplot2)
+library(sf)
 ```
 
 # Overview
@@ -51,9 +52,61 @@ glimpse(cats_uk_reference)
 
 ```{r}
 cats_uk %>% 
-  count(tag_id, sort = TRUE)
+        count(tag_id, sort = TRUE)
+```
+
+
+## Maps?
+
+Here is code shared during the R-Ladies/phillyRUG event on Feb 15th, 2023
+
+```{r}
+# shapefile
+cats_uk_sf <- cats_uk %>% 
+        left_join(cats_uk_reference) %>% 
+        st_as_sf(coords = c("location_long", "location_lat"), 
+                 crs = 4326)
+
+uk <- map_data(map = "world", region = "UK") %>%
+        filter(subregion == "Great Britain")
+# st_as_sf(coords = c("long", "lat")) %>%
+# st_crop(., xmin = -5.758854, xmax = -4.208614, ymin = 50.10352, ymax = 50.88222, crs = 4326)
+
+
+mapTheme <- function(base_size = 12) {
+        theme(
+                text = element_text(color = "black", family="Avenir"),
+                plot.title = element_text(size = 18,colour = "black", hjust = 0.5),
+                plot.subtitle=element_text(face="italic", hjust = 0.5),
+                plot.caption=element_text(size = 7, hjust = 0.5),
+                axis.ticks = element_blank(),
+                panel.background = element_blank(), 
+                axis.text = element_blank(),
+                panel.grid.minor = element_blank(),
+                panel.border = element_rect(colour = "white", fill=NA, size=2)
+        )
+}
+
+ggplot(uk) +
+        # geom_polygon(fill = "gray", colour = "gray80", aes(x = long, y = lat, group = group)) +
+        coord_map(xlim = c(-6, -4), ylim = c(50, 52), clip = "off") +
+        geom_sf(data = cats_uk_sf, shape = 21, size = 3, aes(fill = log(ground_speed))) +
+        scale_fill_distiller(palette = "YlGnBu", name = "Cat Speed") 
+
+```
+
+
+Simple plot without the map?
+
+```{r}
+cats_uk %>% 
+        ggplot(aes(y = location_lat, x = location_long, fill = log10(ground_speed))) +
+        geom_point(shape = 21, size = 3) + 
+        scale_fill_distiller(palette = "YlGnBu", name = "Cat Speed") + 
+        theme_minimal()
+
+# Could we get the centroids of each cat? Then plot their max radii and color those?
 ```
 
 # Contact information
 For any questions, contact <philly@rladies.org>
-  
