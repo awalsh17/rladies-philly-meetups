@@ -1,0 +1,137 @@
+---
+title: "Tidy Tuesday Meetup"
+subtitle: "2023 week 6: Big Tech Stock Prices"
+author: "Alice Walsh for R-Ladies Philly"
+date: "2023-02-15"
+output: 
+  html_document:
+    theme: lumen
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages, echo=FALSE}
+# This code chunk won't be displayed in final product because set echo=FALSE
+library(dplyr)
+library(ggplot2)
+library(gghighlight)
+```
+
+# Overview
+
+Let's look at some fun data! 
+
+https://github.com/rfordatascience/tidytuesday/tree/master/data/2023/2023-02-07
+
+
+# Load the data
+
+```{r}
+big_tech_stock_prices <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-02-07/big_tech_stock_prices.csv')
+big_tech_companies <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-02-07/big_tech_companies.csv')
+
+glimpse(big_tech_stock_prices)
+glimpse(big_tech_companies)
+```
+
+# Ideas
+
++ Make some plots or tables to explore the trends in prices
++ When did prices peak?
++ If you bought this stock ten years ago, what would your return be?
++ If you bought 52 week low, what would your return be?
++ Which stocks have done the best?
++ Integrate other data on these companies?
++ Add/find data on other non-big tech public companies?
+
+```{r}
+# How many rows per stock
+count(big_tech_stock_prices, stock_symbol)
+
+# get the highs, lows, averages per stock
+summary_big_tech <- big_tech_stock_prices %>% 
+        filter(date > "2010-01-01") %>% 
+        group_by(stock_symbol) %>% 
+        summarise(low = min(low),
+                  high = max(high),
+                  average_open = mean(open),
+                  .groups = "drop")
+```
+
+
+### Plot
+
+```{r}
+# test gghighlight
+big_tech_stock_prices %>% 
+        ggplot(aes(x = date, y = open)) + 
+        geom_line(aes(group = stock_symbol)) + 
+        gghighlight(max(open) > 600) +
+        theme_minimal()
+
+# test ploty
+myplot <- big_tech_stock_prices %>% 
+        ggplot(aes(x = date, y = open)) + 
+        geom_line(aes(group = stock_symbol))
+library(plotly)
+ggplotly(myplot)
+```
+
+
+## Add other companies to compare to big tech
+```{r}
+library(quantmod)
+# https://www.nasdaq.com/market-activity/stocks/screener
+mega_healthcare <- 
+        c("ABBV",
+          "AZN",
+          "JNJ",
+          "LLY",
+          "MRK",
+          "NVO",
+          "PFE",
+          "UNH")
+all_stocks <- lapply(setNames(mega_healthcare, mega_healthcare),
+                     function(x)
+                             getSymbols(x, auto.assign = FALSE) %>%
+                             as.data.frame() %>%
+                             rename("open"=1,"high"=2,"low"=3,"close"=4,"volume"=5,"adjusted"=6) %>%
+                             tibble::rownames_to_column(var = "date"))
+all_stocks_df <- bind_rows(all_stocks, .id = "symbol")
+
+glimpse(all_stocks_df)
+
+healthcare <- all_stocks_df
+names(healthcare) <- c("stock_symbol", "date", "open", "high", "low", "close", "volume", "adj_close")
+healthcare$sector <- "healthcare"
+big_tech_stock_prices$sector <- "tech"
+
+healthcare <- rbind(big_tech_stock_prices, healthcare)
+        
+```
+
+```{r}
+# gghighlight with facet - ada labels too
+last_price <- healthcare %>% 
+        group_by(stock_symbol) %>% 
+        slice_max(date, n = 1)
+healthcare %>% 
+        ggplot(aes(x = date, y = open)) + 
+        geom_line(aes(group = stock_symbol, color = sector)) + 
+        facet_wrap(~sector, ncol = 1) + 
+        geom_label(aes(label = stock_symbol, y = open, x = date),
+                   data = last_price) + 
+        gghighlight() + 
+        scale_color_manual(values = c("dodgerblue3", "goldenrod")) + 
+        labs(y = "Opening Price", x = "Date") + 
+        theme_minimal() 
+        
+```
+
+# Contact information
+For any questions, contact <philly@rladies.org>
