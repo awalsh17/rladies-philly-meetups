@@ -141,9 +141,17 @@ ggplot(winner_weather, aes(precipitation, time)) +
   theme_bw()
 
 ggplot(winner_weather, aes(max_temp, time)) + 
-  geom_point(colour = "#88398A") + 
-  facet_grid(cols = vars(category)) + 
-  theme_bw()
+        geom_point(aes(colour = category)) + 
+        facet_wrap(~category, scales = "free") + 
+        theme_bw() + 
+        scale_y_time(
+                labels = ~paste0(lubridate::hour(.x), "H")
+        ) + 
+        labs(title = "temperatures don't affect the winners!")
+
+ggplot(marathon_weather, aes(max_temp, finishers)) + 
+        geom_point() + 
+        labs(title = "but temp does impact the number of finishers!")
 ```
 
 Now we had the idea to look at models including the year and weather.
