@@ -1,0 +1,56 @@
+---
+title: "Tidy Tuesday Meetup"
+subtitle: "2023 week ?: Diwali Sales Data"
+author: "Alice Walsh for R-Ladies Philly"
+date: "2023-11-14"
+output: 
+  html_document:
+    theme: lumen
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages, echo=FALSE}
+# This code chunk won't be displayed in final product because set echo=FALSE
+library(dplyr) # for data manipulation
+library(ggplot2) # for plots
+
+theme_set(theme_light())
+```
+
+# Overview
+
+Let's look at some fun data as part of a tidy tuesday event. This week, the 
+data is "Diwali Sales Data."
+
+https://github.com/rfordatascience/tidytuesday/tree/master/data/2023/2023-11-14
+
+https://www.kaggle.com/datasets/saadharoon27/diwali-sales-dataset
+
+# Load the data
+
+```{r}
+sales <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-11-14/diwali_sales_data.csv')
+
+glimpse(sales)
+```
+
+# Ideas
+
++ Map?
++ Predict sales?
+
+# Analysis
+
+```{r}
+
+```
+
+
+# Contact information
+For any questions, contact <philly@rladies.org>
