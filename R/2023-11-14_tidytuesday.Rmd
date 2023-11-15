@@ -19,7 +19,8 @@ knitr::opts_chunk$set(echo = TRUE)
 # This code chunk won't be displayed in final product because set echo=FALSE
 library(dplyr) # for data manipulation
 library(ggplot2) # for plots
-
+library(usemodels) # creates template code
+library(tidymodels) # meta-package
 theme_set(theme_light())
 ```
 
@@ -36,6 +37,8 @@ https://www.kaggle.com/datasets/saadharoon27/diwali-sales-dataset
 
 ```{r}
 sales <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-11-14/diwali_sales_data.csv')
+# load the data downloaded direct from Kaggle
+sales_kaggle <- readr::read_csv("~/Downloads/Diwali Sales Data.csv")
 
 glimpse(sales)
 ```
@@ -45,12 +48,168 @@ glimpse(sales)
 + Map?
 + Predict sales?
 
-# Analysis
+# QUALITY CONTROL!!!
 
 ```{r}
+# Do some visual inspection of the data - something looks weird with the USer_ID
+sales |> add_count(User_ID) |> View()
+# explore some plots
+count(sales, User_ID) |> pull(n) |> hist()
+# Age by Amount
+lm(Amount ~ Age, data = sales) |> broom::tidy()
+lm(Amount ~ Age, data = sales) |> broom::glance()
+
+sales |> 
+  ggplot(aes(Age, Amount)) + 
+  geom_point(alpha = 0.4) + 
+  geom_smooth(method = "lm")
+
+# Marital status
+sales |> 
+  distinct(User_ID, .keep_all = TRUE) |> 
+  ggplot(aes(x = Marital_Status, y = Age, color = factor(Marital_Status))) + 
+  geom_boxplot()
+
+lm(Amount ~ Age + Marital_Status, data = sales) |> broom::tidy()
+lm(Amount ~ Age, data = sales) |> broom::glance()
+
+sales |> 
+  ggplot(aes(Age, Amount, color = factor(Marital_Status))) + 
+  geom_point(alpha = 0.4) + 
+  geom_smooth(method = "lm")
 
 ```
 
+
+
+# NEW DATASET!!!
+
+```{r}
+taylor_album_songs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-10-17/taylor_album_songs.csv')
+taylor_all_songs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-10-17/taylor_all_songs.csv')
+taylor_albums <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-10-17/taylor_albums.csv')
+
+```
+
+# Explore data
+
+```{r}
+taylor_album_songs |> 
+  ggplot(aes(y = valence, x = mode_name)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(height = 0, width = 0.2) + coord_flip()
+
+# Trends by minor or major key
+taylor_album_songs |> 
+  tidyr::pivot_longer(danceability:tempo, names_to = "metric") |>
+  ggplot(aes(y = value, x = mode_name)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(height = 0, width = 0.2) + coord_flip() + 
+  facet_wrap(~metric, scales = "free")
+  
+# Trends by minor or key signature
+taylor_album_songs |> 
+  tidyr::pivot_longer(danceability:tempo, names_to = "metric") |>
+  ggplot(aes(y = value, x = time_signature)) + 
+  # geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(height = 0, width = 0.2) + 
+  coord_flip() + 
+  facet_wrap(~metric, scales = "free")
+  
+# Trends over time
+taylor_album_songs |> 
+  mutate(track_release_year = lubridate::year(track_release)) |>
+  tidyr::pivot_longer(danceability:tempo, names_to = "metric") |>
+  ggplot(aes(y = value, x = track_release_year, group = track_release_year)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(height = 0, width = 0.2) + 
+  facet_wrap(~metric, scales = "free")
+
+# Trends by album name
+taylor_album_songs |> 
+  tidyr::pivot_longer(danceability:tempo, names_to = "metric") |>
+  ggplot(aes(y = value, x = album_name)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(height = 0, width = 0.2) + coord_flip() + 
+  facet_wrap(~metric, scales = "free")
+  
+```
+
+# How similar are the songs!!
+
+```{r}
+colSums(is.na(taylor_album_songs))
+
+taylor_filtered <- taylor_album_songs |> select(track_name, danceability:tempo) |> na.omit() |> 
+  as.data.frame()
+mypca <- prcomp(taylor_filtered[, -1], center = T, scale. = T)
+
+cbind(mypca$x, taylor_filtered) |> 
+  ggplot(aes(PC1, PC2, label = track_name)) + 
+  ggrepel::geom_label_repel() + 
+  geom_point()
+
+rownames(taylor_filtered) <- taylor_filtered$track_name
+
+song_distances <- dist(scale(taylor_filtered[, -1])) |> broom::tidy()
+
+song_distances |> 
+  slice_min(distance, n = 5) |> 
+  gt::gt()
+
+```
+
+
+
+
+
+
+
+
+```{r}
+# data budget
+sales_split <- initial_split(sales |>
+                               filter(!is.na(Amount)) |>
+                               select(-User_ID, -Product_ID))
+train_data <- training(sales_split)
+test_data <- testing(sales_split)
+train_folds <- vfold_cv(train_data, 5)
+
+# template
+use_glmnet(Amount ~ ., data = sales)
+```
+
+```{r}
+glmnet_recipe <- 
+  recipe(formula = Amount ~ ., data = train_data) |> 
+  step_dummy(all_factor_predictors()) 
+
+# what does it do?
+glmnet_recipe |> prep() |> bake(new_data = test_data)
+
+glmnet_spec <- 
+  linear_reg(penalty = tune(), mixture = tune()) %>% 
+  set_mode("regression") %>% 
+  set_engine("glmnet") 
+
+glmnet_workflow <- 
+  workflow() %>% 
+  add_recipe(glmnet_recipe) %>% 
+  add_model(glmnet_spec) 
+
+glmnet_grid <- tidyr::crossing(penalty = 10^seq(-6, -1, length.out = 20), 
+                               mixture = c(0.05, 0.2, 0.4, 0.6, 0.8, 1)) 
+
+glmnet_tune <- 
+  tune_grid(glmnet_workflow, 
+            resamples = train_folds, 
+            grid = glmnet_grid) 
+```
+
+```{r}
+glmnet_tune |> collect_metrics() |> arrange(mean)
+glmnet_tune |> autoplot()
+```
 
 # Contact information
 For any questions, contact <philly@rladies.org>
