@@ -15,7 +15,7 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r load_packages, echo=FALSE}
+```{r load_packages, echo=FALSE, warning=FALSE, message=FALSE}
 # This code chunk won't be displayed in final product because set echo=FALSE
 library(dplyr) # for data manipulation
 library(ggplot2) # for plots
@@ -25,6 +25,13 @@ theme_set(theme_light())
 ```
 
 # Overview
+
+We looked at two recent tidy tuesday datasets. 
+
+1. Diwali sales data - but we struggled because the data had some weirdsies
+2. Taylor Swift songs!
+
+# Diwali Sales data
 
 Let's look at some fun data as part of a tidy tuesday event. This week, the 
 data is "Diwali Sales Data."
@@ -36,9 +43,7 @@ https://www.kaggle.com/datasets/saadharoon27/diwali-sales-dataset
 # Load the data
 
 ```{r}
-sales <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-11-14/diwali_sales_data.csv')
-# load the data downloaded direct from Kaggle
-sales_kaggle <- readr::read_csv("~/Downloads/Diwali Sales Data.csv")
+sales <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-11-14/diwali_sales_data.csv', show_col_types = FALSE)
 
 glimpse(sales)
 ```
@@ -52,7 +57,7 @@ glimpse(sales)
 
 ```{r}
 # Do some visual inspection of the data - something looks weird with the USer_ID
-sales |> add_count(User_ID) |> View()
+# sales |> add_count(User_ID) |> View()
 # explore some plots
 count(sales, User_ID) |> pull(n) |> hist()
 # Age by Amount
@@ -80,14 +85,37 @@ sales |>
 
 ```
 
+Hm. The data seems to have some issues that make us suspicious
 
++ The counts of rows by user id do not match the Orders column
++ Some expected trends between demographic features are unlikely (many 12 year olds that are married)
++ The demographic data is inconsistent within user ids
++ Other columns do seem consistent (for example the value of different product categories)
 
-# NEW DATASET!!!
+Overall, we suspect some columns were merged incorrectly or otherwise corrupted earlier.
+
+## check data direct from Kaggle
 
 ```{r}
-taylor_album_songs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-10-17/taylor_album_songs.csv')
-taylor_all_songs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-10-17/taylor_all_songs.csv')
-taylor_albums <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-10-17/taylor_albums.csv')
+# load the data downloaded direct from Kaggle
+sales_kaggle <- readr::read_csv("~/Downloads/Diwali Sales Data.csv", show_col_types = FALSE)
+
+all.equal(sales, sales_kaggle)
+```
+
+# NEW DATASET - Taylor Songs
+
+See also: https://github.com/tashapiro/intro-observable 
+
+Other ideas: Get the lyrics and get text embeddings!
+
+- Check out hugging face APIs: https://huggingface.co/models
+- Check out this API to get the full lyrics to songs: https://github.com/sarbor/taylor_swift_api
+
+```{r}
+taylor_album_songs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-10-17/taylor_album_songs.csv', show_col_types = F)
+taylor_all_songs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-10-17/taylor_all_songs.csv', show_col_types = F)
+taylor_albums <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-10-17/taylor_albums.csv', show_col_types = F)
 
 ```
 
@@ -120,35 +148,49 @@ taylor_album_songs |>
 taylor_album_songs |> 
   mutate(track_release_year = lubridate::year(track_release)) |>
   tidyr::pivot_longer(danceability:tempo, names_to = "metric") |>
-  ggplot(aes(y = value, x = track_release_year, group = track_release_year)) + 
+  ggplot(aes(y = value, x = track_release_year,
+             color = track_release_year,
+             group = track_release_year)) + 
   geom_boxplot(outlier.shape = NA) + 
   geom_jitter(height = 0, width = 0.2) + 
   facet_wrap(~metric, scales = "free")
+```
 
+```{r fig.height=8, fig.width=12}
 # Trends by album name
 taylor_album_songs |> 
   tidyr::pivot_longer(danceability:tempo, names_to = "metric") |>
-  ggplot(aes(y = value, x = album_name)) + 
+  ggplot(aes(y = value, x = album_name, color = album_name)) + 
   geom_boxplot(outlier.shape = NA) + 
-  geom_jitter(height = 0, width = 0.2) + coord_flip() + 
+  geom_jitter(height = 0, width = 0.2) + 
+  coord_flip() + 
   facet_wrap(~metric, scales = "free")
   
 ```
 
-# How similar are the songs!!
+## How similar are the songs?
 
 ```{r}
+# First check if there are any missing values in any columns
 colSums(is.na(taylor_album_songs))
 
-taylor_filtered <- taylor_album_songs |> select(track_name, danceability:tempo) |> na.omit() |> 
+# Next created a reduced dataset with the numeric values of interest and removing missing values
+taylor_filtered <- taylor_album_songs |> 
+  select(track_name, danceability:tempo) |> 
+  na.omit() |> 
   as.data.frame()
+
+# Run principal components analysis with center and scale to generate a dimensionality reduction
 mypca <- prcomp(taylor_filtered[, -1], center = T, scale. = T)
 
+# plot 
 cbind(mypca$x, taylor_filtered) |> 
   ggplot(aes(PC1, PC2, label = track_name)) + 
   ggrepel::geom_label_repel() + 
-  geom_point()
+  geom_point() + 
+  labs(title = "How similar are Taylor Songs?")
 
+# Now just calculate a regular euclidean distance based on these variables
 rownames(taylor_filtered) <- taylor_filtered$track_name
 
 song_distances <- dist(scale(taylor_filtered[, -1])) |> broom::tidy()
@@ -160,56 +202,14 @@ song_distances |>
 ```
 
 
+## We confirmed via YouTube that the songs were similar
 
+Links:
 
++ That’s When (Taylor’s Version) (From The Vault): https://www.youtube.com/watch?v=aOa6D6ku3dM
++ Bye Bye Baby (Taylor’s Version) (From The Vault): https://www.youtube.com/watch?v=yuFuwXd-B9E
 
-
-
-
-```{r}
-# data budget
-sales_split <- initial_split(sales |>
-                               filter(!is.na(Amount)) |>
-                               select(-User_ID, -Product_ID))
-train_data <- training(sales_split)
-test_data <- testing(sales_split)
-train_folds <- vfold_cv(train_data, 5)
-
-# template
-use_glmnet(Amount ~ ., data = sales)
-```
-
-```{r}
-glmnet_recipe <- 
-  recipe(formula = Amount ~ ., data = train_data) |> 
-  step_dummy(all_factor_predictors()) 
-
-# what does it do?
-glmnet_recipe |> prep() |> bake(new_data = test_data)
-
-glmnet_spec <- 
-  linear_reg(penalty = tune(), mixture = tune()) %>% 
-  set_mode("regression") %>% 
-  set_engine("glmnet") 
-
-glmnet_workflow <- 
-  workflow() %>% 
-  add_recipe(glmnet_recipe) %>% 
-  add_model(glmnet_spec) 
-
-glmnet_grid <- tidyr::crossing(penalty = 10^seq(-6, -1, length.out = 20), 
-                               mixture = c(0.05, 0.2, 0.4, 0.6, 0.8, 1)) 
-
-glmnet_tune <- 
-  tune_grid(glmnet_workflow, 
-            resamples = train_folds, 
-            grid = glmnet_grid) 
-```
-
-```{r}
-glmnet_tune |> collect_metrics() |> arrange(mean)
-glmnet_tune |> autoplot()
-```
+Success!! But note that without centering and scaling the data first (`?scale`), the songs with the smallest distance were nothing alike! 
 
 # Contact information
 For any questions, contact <philly@rladies.org>
